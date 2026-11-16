@@ -1,0 +1,35 @@
+# BEST PRACTICE 1: Pilih base image minimal & spesifik versi (jangan pakai 'latest')
+FROM python:3.12-alpine AS builder
+
+# BEST PRACTICE 2: Set WORKDIR
+WORKDIR /build
+
+# Copy hanya yang perlu
+COPY requirements.txt .
+
+# BEST PRACTICE 3: Install tanpa cache (--no-cache-dir) & simpan di user local
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# STAGE 2: Runtime
+FROM python:3.12-alpine AS runtime
+
+# BEST PRACTICE 4: Bikin non-root user
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
+
+WORKDIR /app
+
+# Copy dependency dari builder
+COPY --from=builder /root/.local /home/appuser/.local
+COPY --chown=appuser:appgroup app.py .
+
+# BEST PRACTICE 5: Set Environment variable (tanpa credential rahasia)
+ENV PATH=/home/appuser/.local/bin:$PATH
+ENV PORT=8080
+
+# BEST PRACTICE 6: Jalankan sebagai non-root user
+USER appuser
+
+# BEST PRACTICE 7: Expose port & gunakan exec form CMD
+EXPOSE 8080
+CMD ["python", "app.py"]
